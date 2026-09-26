@@ -13,6 +13,7 @@ import {
   Save,
   CheckCircle2,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { useEstate } from '../../lib/estateContext';
 import { AdminHeader } from '../../components/admin/AdminHeader';
@@ -27,7 +28,7 @@ interface AdminRescuePageProps {
 }
 
 export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction, onNavigate }) => {
-  const { rescues, saveRescue, deleteRescue } = useEstate();
+  const { rescues, saveRescue, deleteRescue, isConfiguredWithSupabase } = useEstate();
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -240,8 +241,27 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
 
       <div className="px-4 sm:px-6 lg:px-8 space-y-6">
         {editingRescue ? (
-          <div className="bg-white border border-[#B7B0A4]/35 p-4 sm:p-8 lg:p-10 space-y-8 shadow-xs animate-in fade-in duration-150">
-            <form onSubmit={handleSave} className="space-y-8">
+          <div className="space-y-6">
+            {!isConfiguredWithSupabase && (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>
+                    <strong>Storage Notice:</strong> Supabase cloud database is not currently connected, so uploads are saved locally in browser storage. To persist rescues and images directly in Supabase Cloud PostgreSQL & Storage, configure your Supabase keys.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/admin/settings')}
+                  className="underline font-medium text-amber-900 hover:text-amber-950 ml-6 whitespace-nowrap cursor-pointer"
+                >
+                  Configure Database
+                </button>
+              </div>
+            )}
+
+            <div className="bg-white border border-[#B7B0A4]/35 p-4 sm:p-8 lg:p-10 space-y-8 shadow-xs animate-in fade-in duration-150">
+              <form onSubmit={handleSave} className="space-y-8">
               {/* Primary Identity */}
               <div className="space-y-4">
                 <h3 className="text-xs uppercase tracking-[0.2em] text-[#A89472] font-semibold border-b border-[#B7B0A4]/20 pb-2">
@@ -548,6 +568,7 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
                 </div>
               </div>
             </form>
+            </div>
           </div>
         ) : (
           /* Cards vs Table View of Rescues */
