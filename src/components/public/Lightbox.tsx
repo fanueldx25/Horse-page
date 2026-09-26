@@ -102,3 +102,5 @@ export const Lightbox: React.FC<LightboxProps> = ({
     </div>
   );
 };
+
+export default Lightbox;

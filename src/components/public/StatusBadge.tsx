@@ -38,3 +38,5 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     </span>
   );
 };
+
+export default StatusBadge;
