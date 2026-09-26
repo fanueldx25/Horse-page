@@ -7,15 +7,47 @@ import {
   ContactMessage,
   Profile,
 } from '../types/database';
-import {
-  INITIAL_HORSES,
-  INITIAL_RESCUES,
-  INITIAL_JOURNAL,
-  INITIAL_MESSAGES,
-  INITIAL_SITE_SETTINGS,
-} from '../data/seedData';
+import * as SeedModule from '../data/seedData';
 import { supabase, isSupabaseConfigured, testSupabaseConnection } from './supabase';
 import { SuccessStory } from "../types/database";
+
+// Safely extract seed data with fallback arrays to prevent Rollup build failure on external deployments
+const INITIAL_HORSES: Horse[] =
+  (SeedModule as any).INITIAL_HORSES ||
+  (SeedModule as any).default?.INITIAL_HORSES ||
+  [];
+
+const INITIAL_RESCUES: Rescue[] =
+  (SeedModule as any).INITIAL_RESCUES ||
+  (SeedModule as any).default?.INITIAL_RESCUES ||
+  [];
+
+const INITIAL_JOURNAL: JournalPost[] =
+  (SeedModule as any).INITIAL_JOURNAL ||
+  (SeedModule as any).default?.INITIAL_JOURNAL ||
+  [];
+
+const INITIAL_MESSAGES: ContactMessage[] =
+  (SeedModule as any).INITIAL_MESSAGES ||
+  (SeedModule as any).default?.INITIAL_MESSAGES ||
+  [];
+
+const INITIAL_SITE_SETTINGS: SiteSettings =
+  (SeedModule as any).INITIAL_SITE_SETTINGS ||
+  (SeedModule as any).default?.INITIAL_SITE_SETTINGS || {
+    id: 'estate_settings',
+    business_name: 'Sterling Horse Sales',
+    tagline: 'Exceptional Horses. Thoughtfully Bred.',
+    logo_url: '/images/dressage.jpg',
+    email: 'concierge@sterlinghorsesales.com',
+    phone: '+33 2 31 88 42 10',
+    address: 'Houston, Texas',
+    country: 'United States',
+    visiting_hours: 'Saturday and Sunday 1pm to 5pm',
+    about_text: 'Sterling Horse Sales connects buyers with quality horses.',
+    footer_text: 'Breeding exceptional horses with patience, purpose and respect.',
+  };
+
 
 interface EstateContextType {
   // State
