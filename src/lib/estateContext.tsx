@@ -105,6 +105,9 @@ interface EstateContextType {
 
   // Storage / Upload helper
   uploadImage: (file: File, bucket: 'horse-images' | 'rescue-images' | 'journal-images' | 'site-images') => Promise<string>;
+
+  // Cloud Sync
+  syncAllToSupabase: () => Promise<void>;
 }
 
 const EstateContext = createContext<EstateContextType | undefined>(undefined);
@@ -136,7 +139,16 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const saved = localStorage.getItem(STORAGE_KEY_RESCUES);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((r: Rescue) => 
+            r.id !== 'c1b2a3d4-1111-4444-8888-000000000001' &&
+            r.id !== 'c1b2a3d4-2222-4444-8888-000000000002'
+          );
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEY_RESCUES, JSON.stringify(filtered));
+          }
+          return filtered;
+        }
       }
     } catch (e) {
       console.warn('Error reading saved rescues:', e);
@@ -294,19 +306,41 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (horsesRes.data && horsesRes.data.length > 0) {
           setHorses(horsesRes.data);
         }
-        if (rescuesRes.data && rescuesRes.data.length > 0) {
-          const mappedRescues = rescuesRes.data.map((r: any) => ({
+        if (rescuesRes.data) {
+          const filtered = rescuesRes.data.filter((r: any) => 
+            r.id !== 'c1b2a3d4-1111-4444-8888-000000000001' &&
+            r.id !== 'c1b2a3d4-2222-4444-8888-000000000002'
+          );
+          const mappedRescues = filtered.map((r: any) => ({
             ...r,
             rescue_date: r.rescue_date || r.intake_date || new Date().toISOString().split('T')[0],
           }));
-          setRescues(mappedRescues);
+          setRescues((prevLocal) => {
+            const map = new Map();
+            mappedRescues.forEach((r: Rescue) => map.set(r.id, r));
+            prevLocal.forEach((r: Rescue) => {
+              if (!map.has(r.id)) {
+                map.set(r.id, r);
+              }
+            });
+            return Array.from(map.values());
+          });
         }
-        if (journalRes.data && journalRes.data.length > 0) {
+        if (journalRes.data) {
           const allPosts = journalRes.data;
           const regularPosts = allPosts.filter((p: any) => p.category !== 'Testimonial');
           const testimonialPosts = allPosts.filter((p: any) => p.category === 'Testimonial');
 
-          setJournal(regularPosts);
+          setJournal((prevLocal) => {
+            const map = new Map();
+            regularPosts.forEach((p: JournalPost) => map.set(p.id, p));
+            prevLocal.forEach((p: JournalPost) => {
+              if (!map.has(p.id)) {
+                map.set(p.id, p);
+              }
+            });
+            return Array.from(map.values());
+          });
 
           if (testimonialPosts.length > 0) {
             const parsedTestimonials: SuccessStory[] = testimonialPosts.map((p: any) => {
@@ -620,9 +654,7 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         } catch (e: any) {
           console.error('Supabase rescue sync failed:', e);
-          throw new Error(
-            `Supabase error saving rescue: ${e.message || 'Database error'}. Ensure table "public.rescues" exists (run /supabase/FULL_SETUP.sql in Supabase SQL editor).`
-          );
+          throw new Error(`Supabase error saving rescue: ${e.message || 'Database error'}. Ensure table "public.rescues" matches the expected schema (including the "status" column).`);
         }
       }
 
@@ -705,9 +737,7 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         } catch (e: any) {
           console.error('Supabase journal sync failed:', e);
-          throw new Error(
-            `Supabase error saving article: ${e.message || 'Database error'}. Ensure table "public.journal_posts" exists (run /supabase/FULL_SETUP.sql in Supabase SQL editor).`
-          );
+          throw new Error(`Supabase error saving article: ${e.message || 'Database error'}. Ensure table "public.journal_posts" exists.`);
         }
       }
 
@@ -972,27 +1002,27 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const uploadImage = useCallback(
     async (file: File, bucket: 'horse-images' | 'rescue-images' | 'journal-images' | 'site-images'): Promise<string> => {
-      // If Supabase is connected, upload to Supabase storage bucket
       if (isSupabaseConfigured && supabase) {
-        const fileExt = file.name.split('.').pop() || 'jpg';
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        try {
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-        const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+          const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
 
-        if (uploadError) {
-          console.error('Supabase storage upload error:', uploadError);
-          throw new Error(
-            `Supabase Storage upload to "${bucket}" failed: ${uploadError.message}. Make sure the bucket exists and policies allow uploads (run /supabase/FULL_SETUP.sql in Supabase SQL editor).`
-          );
-        }
-
-        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-        if (data?.publicUrl) {
-          return data.publicUrl;
+          if (!uploadError) {
+            const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+            if (data?.publicUrl) {
+              return data.publicUrl;
+            }
+          } else {
+            console.warn('Supabase storage upload warning (falling back to local):', uploadError);
+          }
+        } catch (e) {
+          console.warn('Supabase storage upload exception (falling back to local):', e);
         }
       }
 
@@ -1008,6 +1038,100 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     []
   );
+
+  const syncAllToSupabase = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase is not configured. Please add your URL and Anon Key in Settings.');
+    }
+
+    setIsLoading(true);
+    try {
+      // 1. Sync Site Settings
+      await supabase.from('site_settings').upsert({ id: 'estate_settings', ...settings });
+
+      // 2. Sync Horses
+      for (const horse of horses) {
+        const payload = { ...horse };
+        delete (payload as any).images;
+        await supabase.from('horses').upsert(payload);
+        
+        if (horse.images && horse.images.length > 0) {
+          const imgPayloads = horse.images.map((img, idx) => ({
+            id: isValidUUID(img.id) ? img.id : generateUUID(),
+            horse_id: horse.id,
+            url: img.url,
+            caption: img.caption || null,
+            display_order: img.display_order ?? idx,
+            is_cover: img.is_cover ?? idx === 0,
+          }));
+          await supabase.from('horse_images').upsert(imgPayloads);
+        }
+      }
+
+      // 3. Sync Rescues
+      for (const rescue of rescues) {
+        const payload = {
+          id: rescue.id,
+          name: rescue.name,
+          slug: rescue.slug,
+          rescue_date: rescue.rescue_date,
+          intake_date: rescue.rescue_date,
+          status: rescue.status,
+          short_description: rescue.short_description,
+          story: rescue.story,
+          rehabilitation: rescue.rehabilitation,
+          current_status: rescue.current_status,
+          location: rescue.location,
+          featured: rescue.featured,
+          published: rescue.published,
+          created_at: rescue.created_at,
+          updated_at: rescue.updated_at,
+        };
+        await supabase.from('rescues').upsert(payload);
+
+        if (rescue.images && rescue.images.length > 0) {
+          const imgPayloads = rescue.images.map((img, idx) => ({
+            id: isValidUUID(img.id) ? img.id : generateUUID(),
+            rescue_id: rescue.id,
+            url: img.url,
+            caption: img.caption || null,
+            display_order: img.display_order ?? idx,
+            is_cover: img.is_cover ?? idx === 0,
+          }));
+          await supabase.from('rescue_images').upsert(imgPayloads);
+        }
+
+        if (rescue.story_sections && rescue.story_sections.length > 0) {
+          const secPayloads = rescue.story_sections.map((sec, idx) => ({
+            id: isValidUUID(sec.id) ? sec.id : generateUUID(),
+            rescue_id: rescue.id,
+            title: sec.title,
+            content: sec.content,
+            date_label: sec.date_label || sec.date || sec.stage_date || null,
+            display_order: sec.display_order ?? sec.order ?? idx,
+          }));
+          await supabase.from('rescue_story_sections').upsert(secPayloads);
+        }
+      }
+
+      // 4. Sync Journal Posts
+      if (journal.length > 0) {
+        await supabase.from('journal_posts').upsert(journal);
+      }
+
+      // 5. Sync Testimonials
+      if (testimonials.length > 0) {
+        await supabase.from('testimonials').upsert(testimonials);
+      }
+
+      console.log('Manual cloud sync completed successfully');
+    } catch (err: any) {
+      console.error('Manual cloud sync failed:', err);
+      throw new Error(`Sync failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <EstateContext.Provider
@@ -1041,6 +1165,7 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loginAsAdmin,
         logout,
         uploadImage,
+        syncAllToSupabase,
         testConnection: testSupabaseConnection,
       }}
     >

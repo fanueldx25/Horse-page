@@ -37,6 +37,7 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
   const [isCreating, setIsCreating] = useState(initialAction === 'new');
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
 
     setIsSaving(true);
     setSavedSuccess(false);
+    setSaveError(null);
     try {
       await saveRescue(editingRescue);
       setSavedSuccess(true);
@@ -86,8 +88,9 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
         setEditingRescue(null);
         setIsCreating(false);
       }, 700);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error saving rescue:', err);
+      setSaveError(err.message || 'Failed to save sanctuary record to cloud database.');
     } finally {
       setIsSaving(false);
     }
@@ -242,6 +245,19 @@ export const AdminRescuePage: React.FC<AdminRescuePageProps> = ({ initialAction,
       <div className="px-4 sm:px-6 lg:px-8 space-y-6">
         {editingRescue ? (
           <div className="space-y-6">
+            {saveError && (
+              <div className="p-4 bg-rose-50 border border-rose-300 text-rose-900 text-xs flex items-start space-x-3 shadow-sm animate-in fade-in duration-200">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-rose-950">Cloud Database Sync Alert</p>
+                  <p className="text-rose-800">{saveError}</p>
+                  <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 mt-2 italic">
+                    Note: The missing "status" column in your Supabase table is likely preventing this save. Please run the updated SQL script in your Supabase dashboard.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {!isConfiguredWithSupabase && (
               <div className="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
                 <div className="flex items-center space-x-2">
