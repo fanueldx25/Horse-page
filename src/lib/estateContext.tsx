@@ -295,7 +295,11 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setHorses(horsesRes.data);
         }
         if (rescuesRes.data && rescuesRes.data.length > 0) {
-          setRescues(rescuesRes.data);
+          const mappedRescues = rescuesRes.data.map((r: any) => ({
+            ...r,
+            rescue_date: r.rescue_date || r.intake_date || new Date().toISOString().split('T')[0],
+          }));
+          setRescues(mappedRescues);
         }
         if (journalRes.data && journalRes.data.length > 0) {
           const allPosts = journalRes.data;
@@ -560,9 +564,23 @@ export const EstateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       if (isSupabaseConfigured && supabase) {
         try {
-          const payload = { ...newRescue };
-          delete (payload as any).images;
-          delete (payload as any).story_sections;
+          const payload = {
+            id: newRescue.id,
+            name: newRescue.name,
+            slug: newRescue.slug,
+            rescue_date: newRescue.rescue_date,
+            intake_date: newRescue.rescue_date,
+            status: newRescue.status,
+            short_description: newRescue.short_description,
+            story: newRescue.story,
+            rehabilitation: newRescue.rehabilitation,
+            current_status: newRescue.current_status,
+            location: newRescue.location,
+            featured: newRescue.featured,
+            published: newRescue.published,
+            created_at: newRescue.created_at,
+            updated_at: newRescue.updated_at,
+          };
           if (isNew) {
             const { error } = await supabase.from('rescues').insert(payload);
             if (error) throw error;
