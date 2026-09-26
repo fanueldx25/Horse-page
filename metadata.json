@@ -1,0 +1,6 @@
+{
+  "name": "Sterling Horse Sale",
+  "description": "Based in Houston, Texas, Sterling Horse Sale is dedicated to connecting buyers with quality horses while providing a professional, transparent, and straightforward purchasing experience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
